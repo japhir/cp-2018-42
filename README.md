@@ -12,4 +12,4 @@ R-code used to generate the figures in the report require some cleaning up of th
 
 The  LOSCAR  source  code  in  C can  be  obtained  from  the  author  by  sending  a  request  to loscar.model@gmail.com.
 
-Model adjustments (implementation of astronomical forcing) are available upon request from i.j.kocken@uu.nl.
+Model adjustments (implementation of astronomical forcing) are available upon request as patch files from i.j.kocken@uu.nl.
