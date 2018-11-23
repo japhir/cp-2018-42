@@ -1,0 +1,684 @@
+diff -u Loscar-2.0.4/common.h cp-2018-42/common.h
+--- Loscar-2.0.4/common.h	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/common.h		2016-07-12 06:03:14.000000000 +0200
+@@ -64,11 +64,15 @@
+ /* model parameters/vars */	
+ int *kkv,*kiv,ldrestart,svrestart,ffflag,tsnsflag,ltem,cntrfflag,
+     fconv,cinpflag;
++/* orb */
++int orbflag;
++double *yorb,*torb;
++
+ double *vb,*ab,*hb,thc0,thc,t0,tfinal,*ystart,*mxv,*mhd,thbra,thbri,
+-       fepl,rrain,nuwd,frei,eph,*gp,*hgssv,*salv,*prsv,**spm,cac,mgc,
+-       fvc0,finc0,fkrg,pcsi,ncc,nsi,fcsml,*tems,*yems,*tcb0,*tcb0c,
+-       *fdapi,rincc,rvccc,rkrgcc,tso,tto,epscorg,cinp,dccinp,rccinp,
+-       tcin0,tcspan,sclim;
++  fepl,rrain,nuwd,frei,eph,*gp,*hgssv,*salv,*prsv,**spm,cac,mgc,
++  fvc0,finc0,fkrgbur,fkrgoxi,pcsi,ncc,nsi,fcsml,*tems,*yems,*tcb0,
++  *tcb0c,*fdapi,rincc,rvccc,rkrgcc,tso,tto,epscorg,cinp,dccinp,rccinp,
++  tcin0,tcspan,sclim,orbstr,nselvl;
+ /* file names */
+ char fpldstr[BUFSIZ],fpsvstr[BUFSIZ],ffldstr[BUFSIZ];
+ 
+@@ -87,6 +91,12 @@
+   #endif /* FTYS   */
+  #endif /* FSEDCC */
+ #endif /* FSED   */
++
++#ifdef NOISE
++int nseflag;
++double nse,tnse;
++#endif
++
+ /* always needed (for writedat()) */
+ int nz;
+ double *dsv,*zv;
+Binary files Loscar-2.0.4/csys.o and cp-2018-42/csys.o differ
+Common subdirectories: Loscar-2.0.4/dat and cp-2018-42/dat
+diff -u Loscar-2.0.4/defs.h cp-2018-42/defs.h
+--- Loscar-2.0.4/defs.h	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/defs.h	2017-03-03 17:32:45.000000000 +0100
+@@ -109,6 +109,7 @@
+ #define FSED
+ #ifdef FSED
+  #define NSD (13)   /* # sed boxes per OCN   */
++ /* #define NSD (20)   /\* # sed boxes per OCN   *\/ */
+ #else
+  #define NSD  (0) 
+ #endif
+@@ -161,6 +162,16 @@
+ /* fossil fuel scenarios:                      */
+ /* max emmiss values to read from file 100,000 */
+ #define NEMSMAX (100000)
++
++/* orbital forcing */
++#define SCALE /* scale forcing input in c */
++#define xVERBOSE /* print minima/maxima etc. of input */
++#define NORBMAX (100000) /* max orb values to read from file 100,000 */
++
++/* noise addition to fkrgbur */
++#define NOISE     /* noise is added to fkrgbur */
++#define ADDNOISE  /* noise is added to orbitally forced burial */
++
+ /* OCN Temp change (x deg C per 2xCO2)    */
+ /* Temp relax times (y) Surf, Intrm, Deep */
+ #define TAUS   (20.)
+@@ -220,6 +231,8 @@
+             double *alpu,double *tcb, int *kksv, int ntsl);
+ /* emiss.c */
+ void reademiss();
++/* orb.c */
++void readorb();
+ /* initfree.c */
+ void initfree(int flag);
+ /* initstart.c */
+Common subdirectories: Loscar-2.0.4/docs and cp-2018-42/docs
+Only in cp-2018-42: example.inp
+Only in cp-2018-42: example.sh
+diff -u Loscar-2.0.4/initfree.c cp-2018-42/initfree.c
+--- Loscar-2.0.4/initfree.c	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/initfree.c	2016-07-12 06:56:14.000000000 +0200
+@@ -201,25 +201,33 @@
+  svrestart = 0;
+  /* fossil fuel flag, load emissions ON/OFF = 1/0 */
+  ffflag    = 0; /* 0 default (runtest) */
++ /* orbital forcing flag, load forcing ON/OFF = 1/0 */
++ orbflag   = 0;
+  /* OCN temperature change (CO2-sensitivity) ON/OFF = 1/0  */
+  tsnsflag  = 0;
+  /* carbon input ON/OFF = 1/0 */	
+  cinpflag  = 0;
+ 
+-	 
+  /* default file names: superseded by parameter input file!  */
+  strcpy(fpldstr,"dat/y0preind-2.0.4.dat");   /* load restart   */	 
+  strcpy(fpsvstr,"dat/y0preind-2.0.x.dat");   /* save restart   */
+  strcpy(ffldstr,"dat/Emss/1000_0500.dat"); /* load emissions */
++ strcpy(ffldstr, "dat/Orb/La2004_ins_65d_90_34-13.dat"); /* load forcings */
+ 
+ #ifdef FTYS
+  ldrestart = 1;	
+  ffflag    = 0;	 
++ orbflag   = 0;
+  cinpflag  = 0; /* 0 default (runtest) */
+  strcpy(fpldstr,"dat/y0prepetm-2.0.4.dat"); /* load restart   */
+  strcpy(fpsvstr,"dat/y0prepetm-2.0.x.dat"); /* save restart   */
+ #endif	 
+ 
++ /* default no forcing */
++ orbstr = 1.; /* multiplyer! */
++ /* default no noise level */
++ nselvl = 0.; /* added to original */
++ 
+  /* default OCN temperature change (CO2-sensitivity) */
+  sclim = 3.0;
+ 	 
+@@ -518,9 +526,16 @@
+ 	 
+  /*============== kerogen oxidation ==============*/ 
+ #ifdef FTYS /* TETHYS */
+- fkrg  = 07.e12/AOC;     /* mol C /m2/y 07 [WK92,Berner] */
++ fkrgbur  = 07.e12/AOC;     /* mol C /m2/y 07 [WK92,Berner] */
++ fkrgoxi  = 07.e12/AOC;     /* mol C /m2/y 07 [WK92,Berner] */
+ #else
+- fkrg  = 10.e12/AOC;     /* mol C /m2/y 10 [WK92,Berner] */
++ fkrgbur  = 10.e12/AOC;     /* mol C /m2/y 10 [WK92,Berner] */
++ fkrgoxi  = 10.e12/AOC;     /* mol C /m2/y 10 [WK92,Berner] */
++#endif
++
++#ifdef NOISE
++ nse = 0.;
++ tnse = 0.;
+ #endif
+ 	 
+  /*=========== Long C-Cycle fluxes 13C ===========*/
+@@ -756,8 +771,10 @@
+  fpout = fopen("parms.out","w");
+  if(fpout == NULL) 
+ 	ferrx("initfree(): Can't open file 'parms.out'");
+-	 
+  fprintf(fpout,"%d ffflag  \n",ffflag);
++ fprintf(fpout,"%d orbflag \n",orbflag);
++ fprintf(fpout,"%e orbstr \n",orbstr);
++ fprintf(fpout,"%e nselvl \n",nselvl);
+  fprintf(fpout,"%d tsnsflag\n",tsnsflag);
+  fprintf(fpout,"%e sclim   \n",sclim);
+  for(k=1;k<=3;k++)
+@@ -795,7 +812,8 @@
+  fprintf(fpout,"%e fsh     \n",fsh);	 
+  fprintf(fpout,"%e fvc0    \n",fvc0);	 
+  fprintf(fpout,"%e finc0   \n",finc0);	 
+- fprintf(fpout,"%e fkrg    \n",fkrg);	 
++ fprintf(fpout,"%e fkrgbur    \n",fkrgbur);	 
++ fprintf(fpout,"%e fkrgoxi    \n",fkrgoxi);	 
+  fprintf(fpout,"%e cac     \n",cac);	 
+  fprintf(fpout,"%e mgc     \n",mgc);	 
+  for(k=1;k<=KOC;k++)
+@@ -893,6 +911,10 @@
+    free_dvector(tems,1,ltem);
+    free_dvector(yems,1,ltem);	 
+  }	 
++ if(orbflag == 1){
++   free_dvector(torb,1,ltem);
++   free_dvector(yorb,1,ltem);
++ }
+ 
+ #ifdef FSED
+  free_dvector(dsv,1,NSD);
+@@ -929,6 +951,7 @@
+  printf("   * LOSCAR V %s  Done.                        *\n",VLOSCAR);	
+  printf("   ************************************************\n\n");	
+  printf("  Nunc est bibendum.\n\n");
++ printf("\a"); /* bell when done */
+  timer=time(NULL);
+  printf("%s",asctime(localtime(&timer)));
+ 	 
+diff -u Loscar-2.0.4/loscar.c cp-2018-42/loscar.c
+--- Loscar-2.0.4/loscar.c	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/loscar.c	2016-07-09 05:22:05.000000000 +0200
+@@ -241,6 +241,15 @@
+  else{
+    printf("\n@ Emissions loaded: none\n");
+  }	
++/* optional: run orbital forcing scenario, load forcings */
++ if(orbflag == 1){
++   printf("\n@ Loading orbital forcing: '%s'\n",ffldstr);
++   readorb();
++ }
++ 
++ else{
++   printf("\n@ Orbital forcing loaded: none\n");
++ }
+ 
+  /* initialize y-start values (default or load) */
+  initstart();
+@@ -263,7 +272,12 @@
+  printf("  Alea iacta est.\n");		
+  tick_end  = clock(); /* end clock */
+  wall_time = (double)(tick_end-tick_start)/CLOCKS_PER_SEC;
+- printf("\n@ Wallclock Time = %f sec \n",wall_time);
++ int wall_h = wall_time / (60 * 60);
++ wall_time = wall_time - wall_h * 60;
++ int wall_m = wall_time / 60;
++ double wall_s = wall_time - wall_m * 60;
++ /* printf("\n@ Wallclock Time = %f sec \n",wall_time); */
++ printf("\n@ Wallclock Time = %d:%d:%f \n",wall_h,wall_m,wall_s);
+ 	
+  /* print step info */
+  printf("\n@ Step Info:\n");
+diff -u Loscar-2.0.4/loscarderivs.c cp-2018-42/loscarderivs.c
+--- Loscar-2.0.4/loscarderivs.c	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/loscarderivs.c	2017-02-28 18:11:20.000000000 +0100
+@@ -87,7 +87,7 @@
+  double *eplv,*ealv,*enlv,*pplv,*eclv,*exlv,eah,pph,enh,ech,exh,
+ 	    oi,gtha,gthi,sdn,pco2a,catmp,*kasv0,*kasv,fvc,fsi,finc,
+         fvccc,fsicc,fincc,fkrgcc,*fkrgccb,d13cems,remscc,
+-	    *vask0,*vask,*fmmo,fems=0,femscc,tmp;
++        *vask0,*vask,*fmmo,fems=0,forb=0,femscc,tmp;
+  double *eplvcc,*ealvcc,*eclvcc,*exlvcc,ephcc,eahcc,echcc,exhcc,
+ 	    *rccb,pcco2a,ccatmp;
+  char mssg[BUFSIZ];	
+@@ -1014,11 +1014,37 @@
+  finc = finc0*pow(pco2a/pcsi,ncc); /* CaCO3  */
+ 
+  /*=========== Long C-Cycle fluxes 13C ===========*/
++
++ /* read orbital forcing data */
++ if(orbflag == 1){
++   forb     = finterp(t,torb,yorb,ltem,0); 
++   /* scale fkrgbur with forcing: forcing maxima correspond to burial minima */
++   fkrgbur = fkrgoxi*(1. - (orbstr * forb)); /* note: using fkroxi as fkrg0 */
++ }
++
++ #ifdef NOISE
++ if((t-tnse) > 1.e3) {
++   k = rand() % 100 + 1; /* k ~random between 1 and 100 */ 
++   nse = (double)((k-1.)/99.); /* scale down between 0 and 1 */
++   nse = nse*2.-1.; /* scale to -1, +1 */
++   tnse = t; /* store time noise was added */
++   nseflag = 1;
++ }
++#ifdef ADDNOISE
++ if(orbflag == 1)
++   fkrgbur += fkrgoxi*nse*nselvl; /* scales current burial value with noise based on default burial */
++ else
++   fkrgbur = fkrgoxi*(1. + nse*nselvl); /* using fkrgoxi as fkrg0 */
++#else
++ fkrgbur = fkrgoxi*(1. + nse*nselvl);
++#endif /* ADDNOISE */
++#endif /* NOISE */
++
+  fvccc  = rvccc*fvc;
+  fsicc  = rincc*fsi;
+  fincc  = rincc*finc;
+- fkrgcc = rkrgcc*fkrg;               /* oxidation */
+- vsclr(fkrgccb,alpcorg*fkrg,rccb,NB); /* burial   */
++ fkrgcc = rkrgcc*fkrgoxi;               /* oxidation */
++ vsclr(fkrgccb,alpcorg*fkrgbur,rccb,NB); /* burial   */
+ 
+  /* sediment flags */	
+ #ifdef FSED
+@@ -1079,7 +1105,7 @@
+  for(k=1;k<=NOC;k++){
+      dicp[m1[k]] += 2.*finc*AOC/vb[m1[k]]/NOC;         /* Fin  L wthr:2 */
+      dicp[m1[k]] += 2.*fsi *AOC/vb[m1[k]]/NOC;         /* ... #! Si     */
+-     dicp[m1[k]] -= 1.*fkrg*AOC/vb[m1[k]]/NOC;         /*     #! krgn   */
++     dicp[m1[k]] -= 1.*fkrgbur*AOC/vb[m1[k]]/NOC;         /*     #! krgn   */
+    dicp[m1[k]]   += msumlh(dissm,NOC,k,NSD,1,    ns1)/vb[m1[k]];   /* diss L  */
+    dicp[m2[k]+3] += msumlh(dissm,NOC,k,NSD,1+ns1,ns2)/vb[m2[k]+3]; /* diss I  */
+    dicp[m3[k]+6] += msumlh(dissm,NOC,k,NSD,1+ns2,NSD)/vb[m3[k]+6]; /* diss D  */
+@@ -1209,7 +1235,7 @@
+  	catmp -= kasv[kkv[k]]*(pco2a-pco2[kkv[k]])/AOC; /* mol/m2/y */
+ 
+ #ifdef FSED
+-    catmp +=  fvc - finc - 2.*fsi + fkrg;           /* wthr #!  */
++    catmp +=  fvc - finc - 2.*fsi + fkrgoxi;           /* wthr #!  */
+ #endif
+ 	
+  /* fossil fuel */
+diff -u Loscar-2.0.4/Makefile cp-2018-42/Makefile
+--- Loscar-2.0.4/Makefile	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/Makefile	2016-07-07 10:36:29.000000000 +0200
+@@ -77,6 +77,8 @@
+ 	$(CC) $(CFLAGS) $(CBIT) $(MPSET) csys.c
+ emiss.o: emiss.c defs.h utils.h common.h
+ 	$(CC) $(CFLAGS) $(CBIT) $(MPSET) emiss.c
++orb.o:	orb.c defs.h utils.h common.h
++	$(CC) $(CFLAGS) $(CBIT) $(MPSET) orb.c
+ initfree.o: initfree.c defs.h utils.h common.h
+ 	$(CC) $(CFLAGS) $(CBIT) $(MPSET) initfree.c
+ initstart.o: initstart.c defs.h utils.h common.h
+@@ -95,11 +97,11 @@
+ 	$(CC) $(CFLAGS) $(CBIT) $(MPSET) utils.c
+ writedat.o: writedat.c defs.h utils.h
+ 	$(CC) $(CFLAGS) $(CBIT) $(MPSET) writedat.c
+-loscar.o: csys.o emiss.o initfree.o initstart.o matrix.o loscarderivs.o readparms.o solver.o thmfun.o utils.o writedat.o loscar.c defs.h utils.h common.h
++loscar.o: csys.o emiss.o orb.o initfree.o initstart.o matrix.o loscarderivs.o readparms.o solver.o thmfun.o utils.o writedat.o loscar.c defs.h utils.h common.h
+ 	$(CC) $(CFLAGS) $(CBIT) $(MPSET) loscar.c
+ # Link object files
+ loscar: loscar.o
+-	$(CC) $(CBIT) -o $(EXENAME) csys.o emiss.o initfree.o initstart.o matrix.o loscarderivs.o readparms.o solver.o thmfun.o utils.o writedat.o loscar.o $(LIBS)
++	$(CC) $(CBIT) -o $(EXENAME) csys.o emiss.o orb.o initfree.o initstart.o matrix.o loscarderivs.o readparms.o solver.o thmfun.o utils.o writedat.o loscar.o $(LIBS)
+ 
+ info: 
+ 	@echo $(UNAME)
+@@ -108,6 +110,5 @@
+ 
+ # clean
+ clean:
+-	\rm *.o *~ loscar.x loscar.exe
+-
++	rm *.o loscar.x
+ 
+Only in cp-2018-42: orb.c
+Only in cp-2018-42: orb.o
+diff -u Loscar-2.0.4/preind.inp cp-2018-42/preind.inp
+--- Loscar-2.0.4/preind.inp	2011-12-03 20:03:21.000000000 +0100
++++ cp-2018-42/preind.inp	2016-07-07 10:11:08.000000000 +0200
+@@ -120,13 +120,13 @@
+ #===============================================================#
+ # input starts below this line
+ 
+-RESTART dat/y0preind-2.0.4.dat
+-#SVSTART dat/y0preind-2.0.4.dat
++RESTART dat/pco2_350.dat
++#SVSTART dat/pco2_350.dat
+ 
+-EMSFILE dat/Emss/1000_0500.dat
++#EMSFILE dat/Emss/1000_0500.dat
+ 
+-TSTART  1700.
+-TFINAL  3000.
++TSTART  0.
++TFINAL  2.e5
+ 
+ #CINP    1000.
+ #D13CIN  -55.
+@@ -143,7 +143,7 @@
+ TEMP    20. 20. 20. 10. 10. 10. 2. 2. 2. 2.
+ SAL     34.72 34.72 34.72 34.72 34.72 34.72 34.72 34.72 34.72 34.72
+ 
+-PCO2SI  280.0
++PCO2SI  350.0
+ FDICI   00.00
+ FALKI   00.00
+ FPO4I   00.00
+diff -u Loscar-2.0.4/readparms.c cp-2018-42/readparms.c
+--- Loscar-2.0.4/readparms.c	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/readparms.c	2016-07-12 06:24:28.000000000 +0200
+@@ -113,7 +113,29 @@
+  /*setpstr: set arguments 1 and 2 */	
+  setpstr(&ffflag,ffldstr,varstr,ffound,np,npok,pstr,ntxt);
+ 
+-	
++ /*=========== load orbital forcing file ==================*/
++ varstr = "ORBFILE";     /* name of parameter */
++ npok   = 1;             /* # par values expected */
++ ntxt   = "none.";
++ getparms(fparm,varstr,&ffound,&np,pval,pstr);
++ setpstr(&orbflag,ffldstr,varstr,ffound,np,npok,pstr,ntxt);
++
++ /*========= set strength of orbital forcing ==============*/
++ varstr = "ORBSTRENGTH";     /* name of parameter */
++ npok   = 1;             /* # par values expected */
++ punit  = " (-)";       /* parameter unit */
++ ntxt   = "none.";
++ getparms(fparm,varstr,&ffound,&np,pval,pstr);
++ setpvald(&orbstr,varstr,ffound,np,npok,pval,punit,ntxt);
++ 
++  /*========= set strength of orbital forcing ==============*/
++ varstr = "NOISELEVEL";     /* name of parameter */
++ npok   = 1;             /* # par values expected */
++ punit  = " (-)";
++ ntxt   = "none.";
++ getparms(fparm,varstr,&ffound,&np,pval,pstr);
++ setpvald(&nselvl,varstr,ffound,np,npok,pval,punit,ntxt);
++ 
+  /*===================== time start =======================*/	
+  varstr = "TSTART";	    /* name of parameter     */
+  npok   = 1;	        /* # par values expected */
+@@ -123,7 +145,6 @@
+  /*setpvald: set argument 1 */	
+  setpvald(&t0,varstr,ffound,np,npok,pval,punit,ntxt);	
+ 
+-	
+  /*====================== time final ======================*/
+  varstr = "TFINAL";	    /* name of parameter     */
+  npok   = 1;	        /* # par values expected */
+@@ -133,7 +154,6 @@
+  /*setpvald: set argument 1 */	
+  setpvald(&tfinal,varstr,ffound,np,npok,pval,punit,ntxt);	
+ 
+-	
+  /*================= carbon input ==========================*/	
+  varstr = "CINP";       /* name of parameter     */
+  npok   = 1;	        /* # par values expected */
+@@ -145,7 +165,6 @@
+  if(ffound == 1)
+     cinpflag = 1;	
+ 
+-	
+  /*================= d13C carbon input =====================*/	
+  varstr = "D13CIN";     /* name of parameter     */
+  npok   = 1;	        /* # par values expected */
+@@ -304,7 +323,6 @@
+     thc   = thc0;
+  }
+ 
+-
+  /*=============== LL Biopump utilization =================*/
+  varstr = "FBIOL";      /* name of parameter     */
+  npok   = 1;	        /* # par values expected */
+Binary files Loscar-2.0.4/readparms.o and cp-2018-42/readparms.o differ
+Binary files Loscar-2.0.4/solver.o and cp-2018-42/solver.o differ
+Only in cp-2018-42: test
+Binary files Loscar-2.0.4/thmfun.o and cp-2018-42/thmfun.o differ
+diff -u Loscar-2.0.4/utils.c cp-2018-42/utils.c
+--- Loscar-2.0.4/utils.c	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/utils.c		2016-07-07 10:40:21.000000000 +0200
+@@ -483,6 +483,43 @@
+ 
+  }
+ 
++ /*** fmaxv: find vector max, returns int ***/
++ int fmaxv(double *u, int n, int ordflag)
++ {
++   int i,imax;
++   double umax;
++   
++   /* search order 1,...,n */
++   if(ordflag == 1){
++     imax = 1;
++     umax = u[1];
++
++     for(i=2;i<=n;i++){
++       if((double)(u[i]) > (double)(umax)){
++	 imax = i;
++	 umax = u[i];
++       }
++     }
++   }
++
++   /* search order n,...,1 */
++   if (ordflag == 2) {
++     imax = n;
++     umax = u[n];
++
++     for(i=n-1;i>=1;i--){
++       if((double)(u[i]) > (double)(umax)){
++	 imax = i;
++	 umax = u[i];
++       }
++     }
++     
++   }
++   
++   return(imax);
++   
++ }
++	
+  /*** finterp: linear interpol., returns double ***/
+  double finterp(double x,double *xv,double *yv,int n,int errflag)
+  {
+diff -u Loscar-2.0.4/utils.h cp-2018-42/utils.h
+--- Loscar-2.0.4/utils.h	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/utils.h		2016-07-07 10:41:06.000000000 +0200
+@@ -109,5 +109,8 @@
+ /*** fminv: find vector min, returns int ***/
+ int fminv(double *u,int n,int ordflag);
+ 
++/*** fmaxv: find vector max, returns int ***/
++int fmaxv(double *u,int n,int ordflag);
++
+ /*** finterp: linear interpol., returns double ***/
+ double finterp(double x,double *xv,double *yv,int n,int errflag);
+--- Loscar-2.0.4/emiss.c	2011-12-03 20:03:20.000000000 +0100
++++ cp-2018-42/orb.c		2017-02-28 18:07:32.000000000 +0100
+@@ -1,4 +1,4 @@
+-/****************************************************************
++/****************************************************************
+    LOSCAR Model: Long-term Ocean-atmosphere-Sediment 
+                  CArbon cycle Reservoir Model
+ 
+@@ -19,6 +19,8 @@
+    1000 Pope Road, MSB 504
+    Honolulu, HI 96822, USA
+    email: loscar.model@gmail.com
++   
++   Ilja Kocken's orbital forcing reader, based on emissions file
+ 	   
+ *****************************************************************/
+ #include <math.h>
+@@ -27,48 +29,52 @@
+ 
+ #include "common.h"
+ 
+-/*============================================================*/
+-/*==================== reademiss() ===========================*/
++/*============================================================*/
++/*====================== readorb() ===========================*/
+ /*============================================================*/
+ /*
+  updates: 
+-
+-  04/03/11 deleted femiss() (replaced by finterp())
+-  03/26/11 new file
++  
++  2016-05-19 add scaling of forcing variable in here
++  2016-05-18 add scaling of time variable
++  2016-05-16 new file
+ 	  
+  */
+ 
+-void reademiss()
++void readorb()
+ {
+  double *tmp1,*tmp2;
+  int i=1,rdflag=0;
+  char mssg[BUFSIZ];	
++ double yorbmin,yorbmax,yorbsum,yorbmean; 
+ 
+- FILE *fpems;
++ FILE *fporb;
+ 
+  ltem = 0;
+- tmp1 = dvector(1,NEMSMAX);
+- tmp2 = dvector(1,NEMSMAX);
++ tmp1 = dvector(1,NORBMAX);
++ tmp2 = dvector(1,NORBMAX);
+ 	 
+- /* open emission file */
+- fpems = fopen(ffldstr,"r");
+- if(fpems == NULL){ 
+-    sprintf(mssg,"reademiss(): Can't open emission file '%s'",ffldstr);
++ /* open orbital forcing file */
++ fporb = fopen(ffldstr,"r");
++ if(fporb == NULL){ 
++    sprintf(mssg,"readorb(): Can't open orbital forcing file '%s'",ffldstr);
+ 	ferrx(mssg);
+  } 
+ 
+- /* read emissions */
++ /* read orbital forcing */
+  while(rdflag != EOF){
+-    rdflag = fscanf(fpems,"%le %le",&tmp1[i],&tmp2[i]);
++    rdflag = fscanf(fporb,"%le %le",&tmp1[i],&tmp2[i]);
+     if(rdflag == 1)
+-         ferrx("reademiss(): Emission file: #values/line read = 1. need 2.");		 
++         ferrx("readorb(): Orbital forcing file: #values/line read = 1. need 2.");
++
+     if(rdflag  > 2)
+-         ferrx("reademiss(): Emission file: #values/line read > 2. need 2.");		 
++         ferrx("readorb(): Orbital forcing file: #values/line read > 2. need 2.");
++
+     if(rdflag == 2){
+ 	  ltem = i;
+       /*printf("%d %e %e\n",ltem,tmp1[i],tmp2[i]);*/
+-	  if(ltem > NEMSMAX)
+-         ferrx("reademiss(): Too many emission values. Increase NEMSMAX?");
++	  if(ltem > NORBMAX)
++         ferrx("readorb(): Too many forcing values. Increase NORBMAX?");
+       i += 1;
+ 	} else { /* EOF */ 
+ 		 /* printf("%d %d",rdflag,EOF); */
+@@ -76,28 +82,104 @@
+ 	}
+  }
+ 	 
+- /* close emission file */
+- fclose(fpems);
++ /* close orbital forcing file */
++ fclose(fporb);
+ 
+  if(ltem == 0)
+-    ferrx("reademiss(): No. of emission values = 0?");
++    ferrx("readorb(): No. of orbital forcing values = 0?");
+ 
+  /* allocate time and emission vectors */	 
+- tems  = dvector(1,ltem);
+- yems  = dvector(1,ltem);
++ torb  = dvector(1,ltem);
++ yorb  = dvector(1,ltem);
+  /* free: see initfree() */
+ 
+  /* copy numbers read from file to time and emission vectors */	 
+  for(i=1;i<=ltem;i++){
+-	 tems[i] = tmp1[i];
+-	 yems[i] = tmp2[i];
+-     /*printf("%e %e\n",tems[i],yems[i]);*/
+- }
+-	
+- free_dvector(tmp1,1,NEMSMAX);
+- free_dvector(tmp2,1,NEMSMAX);
+-	
++   torb[i] = tmp1[i];
++   yorb[i] = tmp2[i];
++   /*printf("%e %e\n",torb[i],yorb[i]);*/
++ }
++
++ #ifdef VERBOSE
++ printf("\n  Unconverted values:\n");
++
++ printf("\n    torb: %le,%le,%le,%le,%le,...\n",torb[1],torb[2],torb[3],torb[4],torb[5]);
++   printf("    yorb: %le,%le,%le,%le,%le,...\n",yorb[1],yorb[2],yorb[3],yorb[4],yorb[5]);
++ #endif
++
++ /* scale the forcing to be normalised between .9 and 1.1 */
++ /* calculate minimum and maximum values */
++ yorbmin = yorb[fminv(yorb,ltem,1)];
++ yorbmax = yorb[fmaxv(yorb,ltem,1)];
++
++#ifdef VERBOSE
++ /* calculate mean value */
++ yorbsum = 0.;
++ for(i=1;i<=ltem;i++){ 
++   yorbsum = yorbsum + yorb[i]; 
++ } 
++ yorbmean = yorbsum/ltem;
++ printf("\n    torbmin: %le\n", torb[fminv(torb,ltem,2)]);
++   printf("    torbmax: %le\n", torb[fmaxv(torb,ltem,2)]);
++
++ printf("\n    yorbmin: %le\n", yorbmin);
++   printf("    yorbmean:%le\n", yorbmean); 
++   printf("    yorbmax: %le\n", yorbmax);
++   printf("    yorbsum: %le\n", yorbsum);
++#endif
++
++#ifdef SCALE /* note that SCALE also converts time values! */
++ /* convert each value */
++ for(i=1;i<=ltem;i++){
++   /* scale Laskar (-kyr) time to model (+year) time */
++   torb[i] = (torb[i] - tmp1[1]) * 1000; 
++   /* scales input forcing between 0 and 1 */ 
++   yorb[i] = (yorb[i] - yorbmin)/(yorbmax - yorbmin);
++ }
++
++ /* calculate yorb sum and mean */
++ yorbsum = 0.;
++ for(i=1;i<=ltem;i++){
++   yorbsum += yorb[i];
++ }
++ yorbmean = yorbsum/ltem;
++
++#ifdef VERBOSE
++ printf("\n    mean after scaling to 0-1: %le\n", yorbmean);
++#endif
++ 
++ /* subtract mean */
++ for(i=1;i<=ltem;i++){
++   /* yorb[i] *= orbstr;  /\* scales with orbstr *\/ */
++   yorb[i] = 2 * (yorb[i] - yorbmean); /* 2 * Z - barZ */
++ }
++
++#ifdef VERBOSE
++ /* as a check */
++ yorbsum = 0;
++ for(i=1;i<=ltem;i++){
++   yorbsum += yorb[i];
++ }
++ yorbmean = yorbsum/ltem;
++ 
++ printf("\n  Converted values:\n");
++
++ printf("\n    torb: %le,%le,%le,%le,%le,...\n",torb[1],torb[2],torb[3],torb[4],torb[5]);
++   printf("    yorb: %le,%le,%le,%le,%le,...\n",yorb[1],yorb[2],yorb[3],yorb[4],yorb[5]);
++
++ printf("\n    torbmin: %le\n", torb[fminv(torb,ltem,2)]);
++   printf("    torbmax: %le\n", torb[fmaxv(torb,ltem,2)]);
++ 
++ printf("\n    yorbmin: %le\n", yorb[fminv(yorb,ltem,1)]);
++   printf("    yorbmean: %le\n", yorbmean);
++   printf("    yorbmax: %le\n", yorb[fmaxv(yorb,ltem,1)]);
++#endif /* VERBOSE */
++
++#endif /* SCALE */
++ 
++ free_dvector(tmp1,1,NORBMAX);
++ free_dvector(tmp2,1,NORBMAX);
+ }
+-/*============================================================*/
+-/*==================== reademiss() END =======================*/
++/*============================================================*/
++/*==================== readorb() END =======================*/
+ /*============================================================*/
