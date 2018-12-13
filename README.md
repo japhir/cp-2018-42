@@ -24,8 +24,8 @@ sources used from the cited publications:
 The `out/` directory contains the results of the R-scripts.
 
 R-code used to generate the figures was omitted, because it would require
-substantial cleaning up and commenting before publication-ready and hence
-possibly useful for others.
+substantial cleaning up and commenting before being publication-ready and 
+possibly useful to others.
 
 ## LOSCAR astronomical forcing
 
@@ -35,11 +35,11 @@ request to [loscar.model@gmail.com](mailto:loscar.model@gmail.com).
 The LOSCAR model version used here was `2.0.4`. To see which changes were made
 to the 2.0.4 LOSCAR model, see the patch file (`Loscar-2.0.4.patch`). In short,
 it introduces astronomical forcing as a new input source, as well as noise. To
-acieve this, we define some new input paramters (`ORBFILE`, `ORBSTRENGTH`, and
+achieve this, we define some new input paramters (`ORBFILE`, `ORBSTRENGTH`, and
 `NOISELEVEL`) and some new global variables for turning on/off the specific
 components (`NOISE`, `SCALE`, `VERBOSE`, `ADDNOISE`, etc.). If you have access
-to the Loscar source code, you can apply the patch running the following comand
-from your terminal.
+to the Loscar source code, you can apply the patch by running the following comand
+from your terminal:
 
 ```{bash}
 patch /Loscar/directory/ loscar.patch
