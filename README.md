@@ -1,4 +1,6 @@
 # Scripts and data used in ‘The 405 kyr and 2.4 Myr eccentricity components in Cenozoic carbon isotope records’
+[![DOI](https://zenodo.org/badge/157687257.svg)](https://zenodo.org/badge/latestdoi/157687257)
+
 [doi:10.5194/cp-2018-42](https://doi.org/10.5194/cp-2018-42) 
 
 [climate of the past discussions](https://www.clim-past-discuss.net/cp-2018-42/) 
