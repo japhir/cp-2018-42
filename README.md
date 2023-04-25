@@ -38,8 +38,10 @@ to the Loscar source code, you can apply the patch by running the following coma
 from your terminal:
 
 ```{bash}
-# download the patch file to ~/Downloads
 # assuming you have Loscar-2.0.4 in your ~/Downloads
 cd ~/Downloads/Loscar-2.0.4/
-patch -p1 < ../Loscar2.0.4.patch
+# download the patch file
+wget https://raw.githubusercontent.com/japhir/cp-2018-42/master/Loscar-2.0.4.patch
+# apply the patch to the whole directory
+patch -p1 < ./Loscar2.0.4.patch
 ```
