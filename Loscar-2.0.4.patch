@@ -473,7 +473,7 @@ diff -u Loscar-2.0.4/utils.h cp-2018-42/utils.h
 +
  /*** finterp: linear interpol., returns double ***/
  double finterp(double x,double *xv,double *yv,int n,int errflag);
---- Loscar-2.0.4/emiss.c	2011-12-03 20:03:20.000000000 +0100
+--- Loscar-2.0.4/orb.c  2023-04-25 19:03:20.000000000 +0100
 +++ cp-2018-42/orb.c		2017-02-28 18:07:32.000000000 +0100
 @@ -1,4 +1,4 @@
 -/****************************************************************
