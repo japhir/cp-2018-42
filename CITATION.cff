@@ -1,0 +1,69 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  Scripts and data used in ‘The 405 kyr and 2.4 Myr
+  eccentricity components in Cenozoic carbon isotope
+  records’
+message: >-
+  If you use this software, please cite both the article in
+  preferred-citation and the software itself.
+type: software
+authors:
+  - given-names: Ilja Japhir
+    family-names: Kocken
+    email: i.j.kocken@uu.nl
+    affiliation: Utrecht University
+    orcid: 'https://orcid.org/0000-0003-2196-8718'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.7864676
+    description: Zenodo
+repository-code: 'https://github.com/japhir/cp-2018-42'
+repository: 'https://zenodo.org/record/7864676'
+abstract: >-
+  This repository contains the R-scripts used to generate
+  the data composite (scripts/read_data.R and
+  scripts/make_datacomposite.R), as well as the data sources
+  used from the cited publications.
+
+
+  The LOSCAR model version used here was 2.0.4. To see which
+  changes were made to the 2.0.4 LOSCAR model, see the patch
+  file (Loscar-2.0.4.patch). In short, it introduces
+  astronomical forcing as a new input source, as well as
+  noise. To achieve this, we define some new input paramters
+  (ORBFILE, ORBSTRENGTH, and NOISELEVEL) and some new global
+  variables for turning on/off the specific components
+  (NOISE, SCALE, VERBOSE, ADDNOISE, etc.). If you have
+  access to the Loscar source code, you can apply the patch
+  by running the following comand from your terminal:
+keywords:
+  - LOSCAR
+  - carbon cycle
+  - eccentricity
+  - Milankovitch
+  - 2.4 Myr
+  - burial
+license: LGPL-3.0-or-later
+preferred-citation:
+  authors:
+    - family-names: Kocken
+      given-names: "Ilja J."
+      orcid: 'https://orcid.org/0000-0003-2196-8718'
+    - family-names: Cramwinckel
+      given-names: "Margot J."
+    - family-names: Zeebe
+      given-names: "Richard E."
+    - family-names: Middelburg
+      given-names: "Jack J."
+    - family-names: Sluijs
+      given-names: Appy
+  type: article
+  year: 2019
+  title: "The 405 kyr and 2.4 Myr eccentricity components in Cenozoic carbon isotope records"
+  journal: Climate of the Past
+  volume: 15
+  pages: 91--104
+  doi: 10.5194/cp-15-91-2019
