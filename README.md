@@ -45,7 +45,7 @@ wget https://raw.githubusercontent.com/japhir/cp-2018-42/master/Loscar-2.0.4.pat
 # copy the emiss.c file to orb.c, our new file
 cp emiss.c orb.c
 # apply the patch to the whole directory
-patch -p1 < ./Loscar2.0.4.patch
+patch -p1 < ./Loscar-2.0.4.patch
 # build the program
 make
 # make the binary executable
